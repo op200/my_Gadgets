@@ -1,4 +1,4 @@
-### 安装依赖
+### 依赖
 ##### Python库
 ```
 pip install opencv-python
