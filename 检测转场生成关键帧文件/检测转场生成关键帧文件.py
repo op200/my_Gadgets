@@ -9,7 +9,7 @@ import os
 # os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 PROGRAM_NAME = "检测转场生成关键帧文件"
-VERSION = "0.1"
+VERSION = "0.1.1"
 HOME_LINK = "https://github.com/op200/my_Gadgets"
 
 
@@ -81,7 +81,7 @@ for cmd in cmds:
     default: {output_path}
 
 -ow <bool>
-    is it overwrite srt
+    is it overwrite txt
     default: {overwrite_txt}
 
 -th/-threshold <int>
