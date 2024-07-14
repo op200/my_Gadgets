@@ -9,7 +9,7 @@ import os
 # os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 PROGRAM_NAME = "检测转场生成关键帧文件"
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 HOME_LINK = "https://github.com/op200/my_Gadgets"
 
 
@@ -150,16 +150,16 @@ if output_path[-4:] != ".txt":
     log.warning("The suffix of the output file is not '.txt' and has been automatically corrected")
     output_path += ".txt"
 
-if not overwrite_txt and os.path.exists(output_path):
-    log.warning("The output file already exists, overwrite it? [Y/N]",80)
-    while conf_overwrite := input():
-        if conf_overwrite=='y' or conf_overwrite=='Y':
-            overwrite_txt=True
-            break
-        elif conf_overwrite=='n' or conf_overwrite=='N':
-            log.info("User terminates program")
-            log.exit()
-
+if not overwrite_txt:
+    if os.path.exists(output_path):
+        log.output("The output file already exists, overwrite it? [Y/N]")
+        while conf_overwrite := input():
+            if conf_overwrite=='y' or conf_overwrite=='Y':
+                break
+            elif conf_overwrite=='n' or conf_overwrite=='N':
+                log.info("User terminates program")
+                log.exit()
+    overwrite_txt=True
 
 
 # 载入视频
