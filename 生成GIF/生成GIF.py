@@ -7,7 +7,6 @@ import numpy as np
 # from math import floor
 
 from threading import Thread
-from time import sleep
 
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
@@ -18,7 +17,7 @@ import shutil
 import subprocess
 
 PROGRAM_NAME = "生成GIF"
-VERSION = "0.1"
+VERSION = "0.1.1"
 HOME_LINK = "https://github.com/op200/my_Gadgets"
 
 #日志
@@ -29,6 +28,7 @@ class log:
     def output(info:str):
         log_Text.insert(tk.END,info+'\n')
         log_Text.see(tk.END)
+        print(info)
 
     @staticmethod
     def error(info:str):
@@ -297,7 +297,7 @@ def submit_path(_):
         video_size_Label.grid(row=0,column=0)
         video_fps_Label.grid(row=0,column=1,padx=8)
         if frame_height > root_Tk.winfo_screenheight()*5/6 or frame_width > root_Tk.winfo_screenwidth()*4/5:
-            scale = max(root_Tk.winfo_screenheight()/frame_height, root_Tk.winfo_screenwidth()/(frame_width+200), 1.8)
+            scale = max((1.2*frame_height+100)/root_Tk.winfo_screenheight(), (1.2*frame_width+500)/root_Tk.winfo_screenwidth(), 1.5)
             new_frame_width,new_frame_height = int(frame_width/scale),int(frame_height/scale)
             frame = cv2.resize(frame,(new_frame_width,new_frame_height))
             log.info(f"视频画幅过大 预览画面已缩小(1/{scale:.2f}-->{new_frame_width}x{new_frame_height})")
