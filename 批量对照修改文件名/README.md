@@ -4,7 +4,5 @@
 可自定义比率和第二后缀
 
 ### 依赖
-##### Python库
-```
-pip install loguru
-```
+
+Python >= 3.13
