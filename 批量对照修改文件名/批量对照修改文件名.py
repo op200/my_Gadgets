@@ -13,7 +13,7 @@ import json
 
 
 PROJECT_NAME = "批量对照修改文件名"
-PROJECT_VERSION = "0.2"
+PROJECT_VERSION = "0.2.1"
 PROJECT_TITLE = f"{PROJECT_NAME} v{PROJECT_VERSION}"
 PROJECT_URL = "https://github.com/op200/my_Gadgets"
 
@@ -26,19 +26,19 @@ os.system(f"title {PROJECT_TITLE}")
 
 class log:
     @staticmethod
-    def info(msg):
+    def info(msg: object):
         print(
             f"\033[32m{datetime.datetime.now().strftime('%Y.%m.%d %H:%M:%S.%f')[:-4]}\033[34m [INFO] {msg}\033[0m"
         )
 
     @staticmethod
-    def warning(msg):
+    def warning(msg: object):
         print(
             f"\033[32m{datetime.datetime.now().strftime('%Y.%m.%d %H:%M:%S.%f')[:-4]}\033[33m [WARNING] {msg}\033[0m"
         )
 
     @staticmethod
-    def error(msg):
+    def error(msg: object):
         print(
             f"\033[32m{datetime.datetime.now().strftime('%Y.%m.%d %H:%M:%S.%f')[:-4]}\033[31m [ERROR] {msg}\033[0m"
         )
@@ -51,9 +51,10 @@ class config:
         "sec_suffix_list": []
     }
 
+    @staticmethod
     def init():
         if platform.system() == "Windows":
-            config.config_dir = os.path.join(os.getenv("APPDATA"), PROJECT_NAME)
+            config.config_dir = os.path.join(os.getenv("APPDATA") or "", PROJECT_NAME)
         elif platform.system() == "Darwin":  # MacOS
             config.config_dir = os.path.join(
                 os.path.expanduser("~"), "Library", "Application Support", PROJECT_NAME
@@ -73,9 +74,11 @@ class config:
         with open(config.config_file_pathname, "rt", encoding="utf-8") as config_file:
             config.config_data = json.load(config_file)
 
+    @staticmethod
     def flush_config_data():
         config.config_data["sec_suffix_list"] = runner.sec_suffix_list
 
+    @staticmethod
     def write_config():
         with open(config.config_file_pathname, "wt", encoding="utf-8") as config_file:
             json.dump(config.config_data, config_file, indent=2)
@@ -88,7 +91,7 @@ class runner:
     list_1: list[Path] = []
     list_2: list[str] = []
     ratio: int = 1
-    sec_suffix_list: list[str] = config.config_data.get("sec_suffix_list") or []
+    sec_suffix_list: list[str] = config.config_data.get("sec_suffix_list", [])
 
     @staticmethod
     def rm_cache():
@@ -116,12 +119,11 @@ class runner:
             return f".{i + 1}"
 
     @staticmethod
-    def add_list_1(str_list: list[str]):
-        for v in str_list:
-            runner.list_1.append(Path(v))
+    def add_list_1(str_list: tuple[str, ...]):
+        runner.list_1.extend(Path(v) for v in str_list)
 
     @staticmethod
-    def add_list_2(str_list: list[str]):
+    def add_list_2(str_list: tuple[str, ...]):
         runner.list_2.extend((os.path.basename(v) for v in str_list))
 
     @staticmethod
@@ -159,9 +161,10 @@ class runner:
         os.makedirs(RENAME_CACHE_FOLDER, exist_ok=True)
 
         res_list = runner.get_res_list()
-        if "" in res_list:
+        empty_indices = [i + 1 for i, v in enumerate(res_list) if v[1] == ""]
+        if empty_indices:
             log.error(
-                f"The ({', '.join(str(i + 1) for i, v in enumerate(res_list) if v[1] == '')})th in list_2 is empty"
+                f"The ({', '.join(map(str, empty_indices))})th in list_2 is empty"
             )
             return
 
@@ -184,10 +187,10 @@ except:  # noqa: E722
     log.warning("Windows DPI Aware failed")
 
 
-def file_dialog():
+def file_dialog() -> tuple[str, ...]:
     tkRoot = tk.Tk()
     tkRoot.withdraw()
-    file_paths = filedialog.askopenfilenames()
+    file_paths = filedialog.askopenfilenames() or tuple()
     tkRoot.destroy()
     return file_paths
 
@@ -197,7 +200,7 @@ def get_input_prompt():
 
 
 def run_command(cmd_list: list[str] | str) -> bool:
-    if type(cmd_list) is str:
+    if isinstance(cmd_list, str):
         cmd_list = [cmd_list]
 
     if len(cmd_list) == 0:
@@ -215,27 +218,35 @@ def run_command(cmd_list: list[str] | str) -> bool:
                 "Help:\n"
                 "  You can input command or use the argument value to run\n"
                 "\n"
+                "\n"
                 "Commands:\n"
                 "  h / help\n"
                 "    Show help\n"
+                "\n"
                 "  v / version\n"
                 "    Show version\n"
+                "\n"
                 "  $ <code>\n"
                 "    Run code directly from the internal environment\n"
                 "    Execute the code string directly after the $\n"
                 '    The string "\\N" will be changed to real "\\n"\n'
+                "\n"
                 "  exit\n"
                 "    Save config, delete cache, exit this program\n"
+                "\n"
                 "  cd <string>\n"
                 "    Change current path\n"
+                "\n"
                 "  cls / clear\n"
                 "    Clear screen\n"
+                "\n"
                 "  open <string>\n"
                 "    Open folder\n"
                 "    conf / config / appdata:\n"
                 "      Open the config folder\n"
                 "    tmp / temp / temporary:\n"
                 "      Open the temp folder\n"
+                "\n"
                 "  add <string>\n"
                 "    Add something to rename\n"
                 "    1:\n"
@@ -244,15 +255,20 @@ def run_command(cmd_list: list[str] | str) -> bool:
                 "      Add reference files\n"
                 "    s / suf / suffix:\n"
                 "      Add second suffix\n"
+                "\n"
                 "  add1\n"
                 "    Same to add 1\n"
+                "\n"
                 "  add2\n"
                 "    Same to add 2\n"
+                "\n"
                 "  adds / addsuf / addsuffix\n"
                 "    Same to add suffix\n"
+                "\n"
                 "  r / ratio / k <int>\n"
                 "    Set the ratio of 'add1 : add2'\n"
                 "    Default: 1\n"
+                "\n"
                 "  list <list option>\n"
                 "    Operate list\n"
                 "    Default:\n"
@@ -263,6 +279,7 @@ def run_command(cmd_list: list[str] | str) -> bool:
                 "      Delete a member from list_1\n"
                 "    del2 / pop2 <index>:\n"
                 "      Delete a member from list_2\n"
+                "\n"
                 "  run [<run option>]\n"
                 "    Run renamer\n"
                 "    Default:\n"
@@ -396,7 +413,7 @@ if __name__ == "__main__":
         try:
             cmd_list = [
                 cmd.strip('"').strip("'").replace("\\\\", "\\")
-                for cmd in shlex.split(command, posix=False)
+                for cmd in shlex.split(command, posix=False)  # type: ignore
             ]
         except ValueError as e:
             cmd_list = None
