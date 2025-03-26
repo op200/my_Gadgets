@@ -1,201 +1,214 @@
-import cv2
-# import numpy as np
+import sys
+import os
+import datetime
 
+from scenedetect.video_stream import VideoOpenFailure
 from scenedetect import open_video, SceneManager, StatsManager
 from scenedetect.detectors import ContentDetector
 
-import sys
-import os
-# os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 PROGRAM_NAME = "检测转场生成关键帧文件"
-VERSION = "0.1.2"
+VERSION = "0.2"
 HOME_LINK = "https://github.com/op200/my_Gadgets"
 
 
-#日志
+# 日志
 class log:
     log_level = 0
 
     @staticmethod
-    def output(info:object):
-        print(info)
+    def output(msg: object):
+        print(
+            f"\033[32m{datetime.datetime.now().strftime('%Y.%m.%d %H:%M:%S.%f')[:-4]}\033[35m {msg}\033[0m"
+        )
 
     @staticmethod
-    def exit():
-        log.error("program interruption")
-        exit()
+    def error(msg: object, level: int = 110):
+        if level > log.log_level:
+            log.output(f"\033[31m[ERROR] {msg}")
 
     @staticmethod
-    def error(info:object, level:int=110):
-        if level>log.log_level:
-            log.output(f"\033[31m[ERROR]\033[0m {info}")
+    def warning(msg: object, level: int = 70):
+        if level > log.log_level:
+            log.output(f"\033[33m[WARNING] {msg}")
 
     @staticmethod
-    def errore(info:object):
-        log.error(info)
-        log.exit()
-
-    @staticmethod
-    def warning(info:object, level:int=70):
-        if level>log.log_level:
-            log.output(f"\033[33m[WARNING]\033[0m {info}")
-
-    @staticmethod
-    def info(info:object, level:int=30):
-        if level>log.log_level:
-            log.output(f"\033[35m[INFO]\033[0m {info}")
+    def info(msg: object, level: int = 30):
+        if level > log.log_level:
+            log.output(f"\033[34m[INFO] {msg}")
 
 
+def change_title(title: str):
+    if os.name == "nt":
+        os.system(f"title {title}")
+    elif os.name == "posix":
+        sys.stdout.write(f"\x1b]2;{title}\x07")
+        sys.stdout.flush()
 
 
 cmds = sys.argv[1:]
 
-input_path:str = None
-output_path:str = None
-overwrite_txt:bool = False
+input_path: str | None = None
+output_path: str | None = None
+overwrite_txt: bool = False
 
-threshold:int = 27
-min_scene_len:int = 1
+threshold: int = 27
+min_scene_len: int = 1
+
+is_print_frame_num: bool = False
 
 for cmd in cmds:
-    if cmd=="-v" or cmd=="-version":
-        log.output(f"{PROGRAM_NAME}\nVersion: {VERSION}\n{HOME_LINK}")
-        exit()
-    if cmd=="-h" or cmd=="-help":
-        print(f"""
-{PROGRAM_NAME} help:
+    match cmd:
+        case "-v" | "-version":
+            log.output(f"{PROGRAM_NAME}\nVersion: {VERSION}\n{HOME_LINK}")
+            sys.exit()
+        case "-h" | "-help":
+            print(f"""
+    {PROGRAM_NAME} help:
 
--h/-help
-    print help
+    -h / -help
+        print help
 
--v/-version
-    print version
+    -v / -version
+        print version
 
--i/-input <string>
-    the input path of a video or img sequence
-    default: {input_path}
+    -i / -input <string>
+        the input path of a video or img sequence
+        Default: {input_path}
 
--o/-output <string>
-    the output path of txt
-    default: {output_path}
+    -o / -output <string>
+        the output path of txt
+        Default: {output_path}
 
--ow <bool>
-    is it overwrite txt
-    default: {overwrite_txt}
+    -th / -threshold <int>
+        Set threshold for transition detection
+        Default: {threshold}
 
--th/-threshold <int>
-    Set threshold for transition detection
-    default: {threshold}
+    -ml / -minlen <int>
+        Set min_scene_len for transition detection
+        Default: {min_scene_len}
 
--ml/-minlen <int>
-    Set min_scene_len for transition detection
-    default: {min_scene_len}
+    -ow
+        is it overwrite txt
+        Default: {overwrite_txt}
 
--loglevel <int>
-    log level
-    if it > 20 , some INFO    will not be print
-    if it > 40 , all  INFO    will not be print
-    if it > 60 , some WARRING will not be print
-    if it > 80 , all  WARRING will not be print
-    if it > 100, some ERROR   will not be print
-    if it > 120, all  ERROR   will not be print
-    if it > 140, all  logs    will not be print
-    default: 0
-        """)
-        exit()
+    -print
+        Print the detected frame num 
+        Default: {is_print_frame_num}
+
+    -loglevel <int>
+        Log level
+        if it > 20 , some INFO    will not be print
+        if it > 40 , all  INFO    will not be print
+        if it > 60 , some WARRING will not be print
+        if it > 80 , all  WARRING will not be print
+        if it > 100, some ERROR   will not be print
+        if it > 120, all  ERROR   will not be print
+        if it > 140, all  logs    will not be print
+        default: 0
+            """)
+            sys.exit()
 
 for i in range(len(cmds)):
-    # input
-    if cmds[i]=="-i" or cmds[i]=="-input":
-        input_path = cmds[i+1]
+    match cmds[i]:
+        # input
+        case "-i" | "-input":
+            input_path = cmds[i + 1]
 
-    # output
-    if cmds[i]=="-o" or cmds[i]=="-output":
-        output_path = cmds[i+1]
+        # output
+        case "-o" | "-output":
+            output_path = cmds[i + 1]
 
-    # overwrite txt
-    if cmds[i]=="-ow":
-        overwrite_txt = True
+        # threshold
+        case "-th" | "-threshold":
+            try:
+                threshold = int(cmds[i + 1])
+            except Exception as e:
+                log.error(f"threshold value error: {e}")
+                sys.exit()
 
-    # threshold
-    if cmds[i]=="-th" or cmds[i]=="-threshold":
-        try:
-            threshold = int(cmds[i+1])
-        except:
-            log.errore("threshold value error")
+        # threshold
+        case "-ml" | "-minlen":
+            try:
+                min_scene_len = int(cmds[i + 1])
+            except Exception as e:
+                log.error(f"min_scene_len value error: {e}")
+                sys.exit()
 
-    # threshold
-    if cmds[i]=="-ml" or cmds[i]=="-minlen":
-        try:
-            min_scene_len = int(cmds[i+1])
-        except:
-            log.errore("min_scene_len value error")
-    
-    # log level
-    if cmds[i]=="-loglevel":
-        try:
-            log.log_level = int(cmds[i+1])
-        except:
-            log.errore("log level error")
+        # overwrite txt
+        case "-ow":
+            overwrite_txt = True
 
+        # print frame num
+        case "-print":
+            is_print_frame_num = True
+
+        # log level
+        case "-loglevel":
+            try:
+                log.log_level = int(cmds[i + 1])
+            except Exception as e:
+                log.error(f"log level error: {e}")
+                sys.exit()
 
 
 if not input_path:
-    log.errore("Missing input file")
-if not output_path:
-    log.errore("Missing output file")
+    log.error("Missing input file")
+    sys.exit()
 
-if output_path[-4:] != ".txt":
-    log.warning("The suffix of the output file is not '.txt' and has been automatically corrected")
+if not output_path:
+    log.error("Missing output file")
+    sys.exit()
+
+elif output_path[-4:] != ".txt":
+    log.warning(
+        "The suffix of the output file is not '.txt' and has been automatically corrected"
+    )
     output_path += ".txt"
 
-if not overwrite_txt:
+
+if overwrite_txt is False:
     if os.path.exists(output_path):
         log.output("The output file already exists, overwrite it? [Y/N]")
         while conf_overwrite := input():
-            if conf_overwrite=='y' or conf_overwrite=='Y':
-                break
-            elif conf_overwrite=='n' or conf_overwrite=='N':
-                log.info("User terminates program")
-                log.exit()
-    overwrite_txt=True
+            match conf_overwrite:
+                case "y" | "Y":
+                    break
+                case "n" | "N":
+                    log.info("User exit program")
+                    sys.exit()
+    overwrite_txt = True
 
-
-# 载入视频
-video_cap = cv2.VideoCapture(input_path)
-if not video_cap.isOpened():
-    log.errore("video can't be readed")
-    pass
-log.info("open video complete", 10)
-video_cap.release()
 
 class TXT:
     line_num = 0
 
-    def __init__(self, path:str):
+    def __init__(self, path: str):
+        f = None
         try:
             if overwrite_txt:
-                f = open(path, 'w')
+                f = open(path, "w")
             else:
-                log.errore("Unknown error 1")
+                log.error("Unknown error 1")
+                sys.exit()
         except IOError:
-            log.error("can not open txt:"+path)
-            log.exit()
-        else:
-            f.close()
-            self.path = path
-            self.line_num = 1
-    
+            log.error("can not open txt:" + path)
+            sys.exit()
+        finally:
+            if f:
+                f.close()
+        self.path = path
+        self.line_num = 1
+
     def start_write(self):
         try:
-            self.srt = open(self.path, 'a')
+            self.srt = open(self.path, "a")
         except IOError:
-            log.error("can not open txt:"+self.path)
-            log.exit()
+            log.error("can not open txt:" + self.path)
+            sys.exit()
         self.writeLine("# keyframe format v1\nfps 0")
 
-    def writeLine(self, line:object):
+    def writeLine(self, line: object):
         self.srt.write(f"{line}\n")
 
     def end_write(self):
@@ -205,7 +218,11 @@ class TXT:
 # 开始
 def find_scenes(video_path):
     # 打开视频
-    video = open_video(video_path)
+    try:
+        video = open_video(video_path)
+    except VideoOpenFailure as e:
+        log.error(f"Open video error: {e}")
+        sys.exit()
 
     # 创建统计管理器对象
     stats_manager = StatsManager()
@@ -216,19 +233,38 @@ def find_scenes(video_path):
         ContentDetector(threshold=threshold, min_scene_len=min_scene_len)
     )
 
+    show_progress: bool = True
+    if is_print_frame_num:
+        show_progress: bool = False
+
+        def _scene_manager_callback(frame_img, frame_num: int):
+            print(frame_num)
+    else:
+
+        def _scene_manager_callback(frame_img, frame_num: int):
+            pass
+
     # 开始场景检测
-    scene_manager.detect_scenes(frame_source=video)
+    scene_manager.detect_scenes(
+        frame_source=video,
+        show_progress=show_progress,
+        callback=_scene_manager_callback,
+    )
 
     # 获取场景列表
     return scene_manager.get_scene_list()
 
 
-log.info("Start detection")
+if __name__ == "__main__":
+    log.info("Start detection")
 
-txt = TXT(output_path)
-txt.start_write()
-for frame_info in find_scenes(input_path):
-    txt.writeLine(frame_info[0].frame_num)
+    txt = TXT(output_path)
+    txt.start_write()
+    try:
+        for frame_info in find_scenes(input_path):
+            txt.writeLine(frame_info[0].frame_num)
+    except KeyboardInterrupt:
+        log.info("User exit program")
 
-
-log.info("END")
+    log.info("END")
+    change_title("END")
