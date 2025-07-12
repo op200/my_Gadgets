@@ -148,9 +148,11 @@ def main(hostname: str):
 
 
 if __name__ == "__main__":
-    for h in [
-        "upos-sz-estgcos.bilivideo.com",
-        "upos-sz-estgoss.bilivideo.com",
-        "upos-sz-mirror08h.bilivideo.com",
-    ]:
+    for h in {
+        "upos-sz-estgcos.bilivideo.com": 0,
+        "upos-sz-estgoss.bilivideo.com": 0,
+        "upos-sz-estghw.bilivideo.com": 0,
+        "upos-sz-mirror08h.bilivideo.com": 0,
+        # 利用静态检查去重
+    }:
         main(h)
