@@ -1,4 +1,5 @@
 import datetime
+import re
 import tkinter as tk
 from tkinter import filedialog
 import ctypes
@@ -13,7 +14,7 @@ import json
 
 
 PROJECT_NAME = "批量对照修改文件名"
-PROJECT_VERSION = "0.2.1"
+PROJECT_VERSION = "0.2.2"
 PROJECT_TITLE = f"{PROJECT_NAME} v{PROJECT_VERSION}"
 PROJECT_URL = "https://github.com/op200/my_Gadgets"
 
@@ -134,9 +135,25 @@ class runner:
             runner.sec_suffix_list.append(sec_suffix)
 
     @staticmethod
-    def sort_list():
-        runner.list_1.sort(key=lambda x: x.name)
-        runner.list_2.sort()
+    def sort_list(sort_type: str = ""):
+        reverse = "r" in sort_type
+        if "n" in sort_type:
+            runner.list_1.sort(
+                key=lambda x: [
+                    int(text) if text.isdigit() else text.lower()
+                    for text in re.split(r"(\d+)", x.name)
+                ]
+            )
+            runner.list_2.sort(
+                key=lambda x: [
+                    int(text) if text.isdigit() else text.lower()
+                    for text in re.split(r"(\d+)", x)
+                ],
+                reverse=reverse,
+            )
+        else:
+            runner.list_1.sort(key=lambda x: x.name)
+            runner.list_2.sort(reverse=reverse)
 
     @staticmethod
     def get_res_list():
@@ -155,8 +172,6 @@ class runner:
 
     @staticmethod
     def run(is_exit: bool):
-        runner.sort_list()
-
         runner.rm_cache()
         os.makedirs(RENAME_CACHE_FOLDER, exist_ok=True)
 
@@ -279,6 +294,9 @@ def run_command(cmd_list: list[str] | str) -> bool:
                 "      Delete a member from list_1\n"
                 "    del2 / pop2 <index>:\n"
                 "      Delete a member from list_2\n"
+                "    sort <string>:\n"
+                "      'n' in string: natural ordering\n"
+                "      'r' in string: reverse the add2\n"
                 "\n"
                 "  run [<run option>]\n"
                 "    Run renamer\n"
@@ -333,8 +351,10 @@ def run_command(cmd_list: list[str] | str) -> bool:
 
         case "add1":
             runner.add_list_1(file_dialog())
+            runner.sort_list()
         case "add2":
             runner.add_list_2(file_dialog())
+            runner.sort_list()
         case "adds" | "addsuf" | "addsuffix":
             runner.add_sec_suffix(cmd_list[1])
 
@@ -373,8 +393,10 @@ def run_command(cmd_list: list[str] | str) -> bool:
                     else:
                         log.info(f"Delete the {cmd_list[2]}th success")
 
+                case "sort":
+                    runner.sort_list(cmd_list[2])
+
                 case _:
-                    runner.sort_list()
                     res_list = runner.get_res_list()
 
                     print(f"second suffix list ({len(runner.sec_suffix_list)}):")
