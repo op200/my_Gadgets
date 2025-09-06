@@ -153,6 +153,8 @@ if __name__ == "__main__":
         "upos-sz-estgoss.bilivideo.com": 0,
         "upos-sz-estghw.bilivideo.com": 0,
         "upos-sz-mirror08h.bilivideo.com": 0,
+        "upos-sz-mirror08c.bilivideo.com": 0,
+        "upos-sz-mirrorcos.bilivideo.com": 0,
         # 利用静态检查去重
     }:
         main(h)
