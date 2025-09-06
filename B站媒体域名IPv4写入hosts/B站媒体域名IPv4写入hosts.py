@@ -129,7 +129,7 @@ async def async_main(hostname: str):
         log.error("未找到有效 IP 地址，终止程序")
         return
 
-    log.info(f"! 解析到 {hostname} 有 {len(ips)} 个IP地址:")
+    log.info(f"! 解析到 {hostname:<36} 有 {len(ips):<2} 个 IP")
 
     # 2. 并发测试每个IP的延迟
     tasks = [measure_ping(ip) for ip in ips]
@@ -137,7 +137,7 @@ async def async_main(hostname: str):
 
     for ip, delay in zip(ips, delays):
         log.info(
-            f"? 测试　 {hostname:<30} {ip:<20} {f'{delay:<6.2f} ms' if delay != float('inf') else '超时'}"
+            f"? 测试　 {hostname:<36} {ip:<20} {f'{delay:<6.2f} ms' if delay != float('inf') else '超时'}"
         )
         entries.append(HostEntry(str(ip), delay))
 
