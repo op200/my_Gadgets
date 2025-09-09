@@ -179,6 +179,7 @@ async def run_all_hosts():
         "upos-sz-mirror08h.bilivideo.com": 0,
         "upos-sz-mirror08c.bilivideo.com": 0,
         "upos-sz-mirrorcos.bilivideo.com": 0,
+        "upos-sz-mirrorbdb.bilivideo.com": 0,
     }  # 利用静态检查去重
 
     # 并发执行所有域名的测试
