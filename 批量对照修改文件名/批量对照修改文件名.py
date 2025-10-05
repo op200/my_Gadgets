@@ -1,4 +1,3 @@
-import datetime
 import re
 import tkinter as tk
 from tkinter import filedialog
@@ -11,10 +10,16 @@ import shutil
 import subprocess
 import platform
 import json
+from typing import NoReturn
+
+from easyrip import log
+
+log.write_level = log.LogLevel.none
+log.init()
 
 
 PROJECT_NAME = "批量对照修改文件名"
-PROJECT_VERSION = "0.2.2"
+PROJECT_VERSION = "0.2.3"
 PROJECT_TITLE = f"{PROJECT_NAME} v{PROJECT_VERSION}"
 PROJECT_URL = "https://github.com/op200/my_Gadgets"
 
@@ -23,26 +28,6 @@ RENAME_CACHE_FOLDER = (
 )
 
 os.system(f"title {PROJECT_TITLE}")
-
-
-class log:
-    @staticmethod
-    def info(msg: object):
-        print(
-            f"\033[32m{datetime.datetime.now().strftime('%Y.%m.%d %H:%M:%S.%f')[:-4]}\033[34m [INFO] {msg}\033[0m"
-        )
-
-    @staticmethod
-    def warning(msg: object):
-        print(
-            f"\033[32m{datetime.datetime.now().strftime('%Y.%m.%d %H:%M:%S.%f')[:-4]}\033[33m [WARNING] {msg}\033[0m"
-        )
-
-    @staticmethod
-    def error(msg: object):
-        print(
-            f"\033[32m{datetime.datetime.now().strftime('%Y.%m.%d %H:%M:%S.%f')[:-4]}\033[31m [ERROR] {msg}\033[0m"
-        )
 
 
 class config:
@@ -99,7 +84,7 @@ class runner:
         shutil.rmtree(RENAME_CACHE_FOLDER, ignore_errors=True)
 
     @staticmethod
-    def exit():
+    def exit() -> NoReturn:
         runner.rm_cache()
         config.flush_config_data()
         config.write_config()
@@ -227,7 +212,7 @@ def run_command(cmd_list: list[str] | str) -> bool:
 
     match cmd_list[0]:
         case "h" | "help":
-            print(
+            log.send(
                 f"{PROJECT_NAME}\nVersion: {PROJECT_VERSION}\n{PROJECT_URL}\n"
                 "\n"
                 "Help:\n"
@@ -307,14 +292,15 @@ def run_command(cmd_list: list[str] | str) -> bool:
             )
 
         case "v" | "ver" | "version":
-            print(f"{PROJECT_NAME} version {PROJECT_VERSION}")
+            log.send(f"{PROJECT_NAME} version {PROJECT_VERSION}")
 
         case str() as s if len(s) > 0 and s[0] == "$":
             try:
                 exec(" ".join(cmd_list)[1:].lstrip().replace(r"\N", "\n"))
             except Exception as e:
-                log.error("Your input command has error:")
-                print(repr(e))
+                log.error(
+                    f"Your input command has error: {repr(e)} {e}", is_format=False
+                )
 
         case "exit":
             runner.exit()
@@ -428,14 +414,14 @@ if __name__ == "__main__":
     while True:
         try:
             command = input(get_input_prompt())
-        except:  # noqa: E722
+        except EOFError:
             log.info("Manually force exit")
             runner.exit()
 
         try:
             cmd_list = [
                 cmd.strip('"').strip("'").replace("\\\\", "\\")
-                for cmd in shlex.split(command, posix=False)  # type: ignore
+                for cmd in shlex.split(command, posix=False)
             ]
         except ValueError as e:
             cmd_list = None
