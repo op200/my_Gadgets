@@ -1,6 +1,11 @@
+import configparser
 import ctypes
 import os
+import platform
+import shutil
+import subprocess
 import tkinter as tk
+import webbrowser
 from threading import Thread
 from tkinter import font as tkfont
 from tkinter import ttk
@@ -9,15 +14,8 @@ import cv2
 import numpy as np
 from PIL import Image, ImageTk
 
-os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
-import configparser
-import platform
-import shutil
-import subprocess
-import webbrowser
-
 PROGRAM_NAME = "生成GIF"
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 HOME_LINK = "https://github.com/op200/my_Gadgets"
 
 
@@ -52,7 +50,7 @@ class log:
 os_type = platform.system()
 if os_type == "Windows":
     config_dir = os.path.join(os.getenv("APPDATA", ""), "生成GIF")
-elif os_type == "Linux" or os_type == "Darwin":
+elif os_type in {"Linux", "Darwin"}:
     config_dir = os.path.join(os.path.expanduser("~"), ".config", "生成GIF")
 else:
     config_dir = ""
@@ -66,10 +64,8 @@ ocr_choice: int = 1
 # 不存在配置则写入默认配置
 config = configparser.ConfigParser()
 config_file_pathname = os.path.join(config_dir, "config.ini")
-if (
-    not os.path.exists(config_file_pathname)
-    or config.read(config_file_pathname)
-    and config.get("DEFAULT", "version") != VERSION
+if not os.path.exists(config_file_pathname) or (
+    config.read(config_file_pathname) and config.get("DEFAULT", "version") != VERSION
 ):
     config["DEFAULT"] = {
         "version": VERSION,
@@ -203,10 +199,7 @@ video_Progressbar = ttk.Progressbar(left_Frame)
 
 
 def draw_video_frame_Label_frameColor(frame_num: int, color: tuple[int, int, int]):
-    global video_frame_img
-    x = round(new_frame_width * frame_num / (frame_count - 1)) - 1
-    if x < 0:
-        x = 0
+    x = max(round(new_frame_width * frame_num / (frame_count - 1)) - 1, 0)
     video_frame_img[: VIDEO_FRAME_IMG_HEIGHT - 1, x] = color
 
 
@@ -219,7 +212,6 @@ def flush_video_frame_Label():
 def draw_video_frame_Label_range(
     start_frame: int, end_frame: int, color: tuple[int, int, int]
 ):
-    global video_frame_img
     video_frame_img[-1, :, :] = 0
     video_frame_img[
         -1,
@@ -238,7 +230,6 @@ frame_now = 0
 
 # 跳转当前帧
 def jump_to_frame():
-    global scale, frame_now, frame_count
     main_rendering_Cap.set(cv2.CAP_PROP_POS_FRAMES, frame_now)
     _, frame = main_rendering_Cap.read()
     try:
@@ -268,10 +259,9 @@ def jump_to_frame():
 
 # 进度条的滚轮事件
 def video_progressbar_mousewheel(event):
-    global frame_now, frame_count
+    global frame_now
     frame_now += 1 if event.delta < 0 else -1
-    if frame_now < 0:
-        frame_now = 0
+    frame_now = max(frame_now, 0)
     if frame_now >= frame_count:
         frame_now = frame_count - 1
 
@@ -286,12 +276,10 @@ video_frame_Label.bind("<MouseWheel>", video_progressbar_mousewheel)
 # 进度条鼠标点击事件
 def video_progressbar_leftDrag(event):
     ratio = event.x / video_Progressbar.winfo_width()
-    if ratio > 1:
-        ratio = 1
-    if ratio < 0:
-        ratio = 0
-    # video_Progressbar["value"] = ratio*100
-    global frame_now, frame_count
+    ratio = min(ratio, 1)
+    ratio = max(ratio, 0)
+    # video_Progressbar["value"] = ratio * 100
+    global frame_now
     frame_now = int((frame_count - 1) * ratio)
     jump_to_frame()
 
@@ -403,7 +391,7 @@ def submit_path(_):
             np.ones((VIDEO_FRAME_IMG_HEIGHT, new_frame_width, 3), np.uint8) * 224
         )
         video_frame_img[-1, :, :] = 1
-        for frame_num in range(0, frame_count):
+        for frame_num in range(frame_count):
             draw_video_frame_Label_frameColor(frame_num, (0, 0, 0))
         flush_video_frame_Label()
 
@@ -440,11 +428,9 @@ frame_num_Frame = ttk.Frame(right_Frame)
 
 
 def enter_to_change_frame_now(_):
-    global frame_now, frame_count
+    global frame_now
 
-    frame_now = int(frame_now_Entry.get())
-    if frame_now < 0:
-        frame_now = 0
+    frame_now = max(int(frame_now_Entry.get()), 0)
     if frame_now >= frame_count:
         frame_now = frame_count - 1
 
@@ -557,7 +543,7 @@ draw_box_right_y.grid(row=0, column=3, padx=15)
 
 
 def enter_to_change_draw_box(_):
-    global scale, right_x, right_y, left_x, left_y, difference_list
+    global right_x, right_y, left_x, left_y, difference_list
 
     difference_list = [-1] * frame_count
 
@@ -727,17 +713,7 @@ start_x, start_y, end_x, end_y = 0, 0, 0, 0
 
 
 def draw_box():
-    global \
-        scale, \
-        frame_now, \
-        start_x, \
-        start_y, \
-        end_x, \
-        end_y, \
-        right_x, \
-        right_y, \
-        left_x, \
-        left_y
+    global right_x, right_y, left_x, left_y
     main_rendering_Cap.set(cv2.CAP_PROP_POS_FRAMES, frame_now)
     _, frame = main_rendering_Cap.read()
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -747,14 +723,10 @@ def draw_box():
     left_x = max(start_x, end_x)
     left_y = max(start_y, end_y)
 
-    if right_x < 0:
-        right_x = 0
-    if right_y < 0:
-        right_y = 0
-    if left_x >= video_review_Label.winfo_width() - 4:
-        left_x = video_review_Label.winfo_width() - 4
-    if left_y >= video_review_Label.winfo_height() - 4:
-        left_y = video_review_Label.winfo_height() - 4
+    right_x = max(right_x, 0)
+    right_y = max(right_y, 0)
+    left_x = min(video_review_Label.winfo_width() - 4, left_x)
+    left_y = min(video_review_Label.winfo_height() - 4, left_y)
     if scale:
         frame = cv2.resize(frame, (new_frame_width, new_frame_height))
     cv2.rectangle(
@@ -846,7 +818,7 @@ def start_to_ready():
 
 
 def end_to_ready():
-    global ocr_reader, srt, is_Listener_threshold_value_Entry, frame_now, end_all_thread
+    global is_Listener_threshold_value_Entry, frame_now, end_all_thread
 
     end_all_thread = True
     frame_now = end_num  # 关闭阈值检测和绘制线程
@@ -938,7 +910,7 @@ def Thread_encoding():
 
 
 def start_encoding():
-    global frame_count, frame_now, start_num, end_num
+    global frame_now, start_num, end_num
 
     if right_x_text.get() < 4 or right_y_text.get() < 4:
         right_x_text.set(frame_width)
@@ -951,12 +923,9 @@ def start_encoding():
         int(start_frame_num_Entry.get()),
         int(end_frame_num_Entry.get()),
     )
-    if start_num < 0:
-        start_num = 0
-    if end_num > frame_count - 1:
-        end_num = frame_count - 1
-    if start_num > end_num:
-        start_num = end_num
+    start_num = max(start_num, 0)
+    end_num = min(end_num, frame_count - 1)
+    start_num = min(start_num, end_num)
     draw_video_frame_Label_range(start_num, end_num, (27, 241, 255))
     flush_video_frame_Label()
 

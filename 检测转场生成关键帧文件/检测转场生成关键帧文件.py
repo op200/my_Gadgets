@@ -1,14 +1,13 @@
-import sys
-import os
 import datetime
+import os
+import sys
 
-from scenedetect.video_stream import VideoOpenFailure
-from scenedetect import open_video, SceneManager, StatsManager
+from scenedetect import SceneManager, StatsManager, open_video
 from scenedetect.detectors import ContentDetector
-
+from scenedetect.video_stream import VideoOpenFailure
 
 PROGRAM_NAME = "检测转场生成关键帧文件"
-VERSION = "0.2"
+VERSION = "0.2.1"
 HOME_LINK = "https://github.com/op200/my_Gadgets"
 
 
@@ -93,7 +92,7 @@ for cmd in cmds:
         Default: {overwrite_txt}
 
     -print
-        Print the detected frame num 
+        Print the detected frame num
         Default: {is_print_frame_num}
 
     -loglevel <int>

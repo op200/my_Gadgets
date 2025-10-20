@@ -44,7 +44,7 @@ async def measure_ping(ip):
         )
 
         try:
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=5)
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=5)
             output = stdout.decode("utf-8", errors="ignore")
 
             # 解析输出获取延迟

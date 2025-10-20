@@ -1,18 +1,17 @@
-import tkinter as tk
-from tkinter import filedialog
 import ctypes
-import sys
-import os
-import shlex
-from datetime import datetime
-import re
 import json
+import os
+import re
+import shlex
+import sys
+import tkinter as tk
+from datetime import datetime
+from tkinter import filedialog
 
 from loguru import logger
 
-
 PROJECT_NAME = "字体子集化批处理"
-PROJECT_VERSION = "0.2"
+PROJECT_VERSION = "0.2.1"
 PROJECT_TITLE = f"{PROJECT_NAME} v{PROJECT_VERSION}"
 PROJECT_URL = "https://github.com/op200/my_Gadgets"
 
@@ -57,6 +56,8 @@ class log:
     def error(__message: str, *args, **kwargs):
         logger.error(__message, *args, **kwargs)
 
+
+log.warning("This is an abandoned project. 这是一个已弃用的项目。")
 
 if os.name == "nt":
     try:

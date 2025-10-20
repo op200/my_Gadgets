@@ -1,15 +1,15 @@
-import re
-import tkinter as tk
-from tkinter import filedialog
 import ctypes
-import sys
+import json
 import os
+import platform
+import re
 import shlex
-from pathlib import Path
 import shutil
 import subprocess
-import platform
-import json
+import sys
+import tkinter as tk
+from pathlib import Path
+from tkinter import filedialog
 from typing import NoReturn
 
 from easyrip import log
@@ -19,7 +19,7 @@ log.init()
 
 
 PROJECT_NAME = "批量对照修改文件名"
-PROJECT_VERSION = "0.2.3"
+PROJECT_VERSION = "0.2.4"
 PROJECT_TITLE = f"{PROJECT_NAME} v{PROJECT_VERSION}"
 PROJECT_URL = "https://github.com/op200/my_Gadgets"
 
@@ -298,9 +298,7 @@ def run_command(cmd_list: list[str] | str) -> bool:
             try:
                 exec(" ".join(cmd_list)[1:].lstrip().replace(r"\N", "\n"))
             except Exception as e:
-                log.error(
-                    f"Your input command has error: {repr(e)} {e}", is_format=False
-                )
+                log.error(f"Your input command has error: {e!r} {e}", is_format=False)
 
         case "exit":
             runner.exit()
