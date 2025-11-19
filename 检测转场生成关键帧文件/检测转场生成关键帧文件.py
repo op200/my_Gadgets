@@ -7,7 +7,7 @@ from scenedetect.detectors import ContentDetector
 from scenedetect.video_stream import VideoOpenFailure
 
 PROGRAM_NAME = "检测转场生成关键帧文件"
-VERSION = "0.2.1"
+VERSION = "0.2.2"
 HOME_LINK = "https://github.com/op200/my_Gadgets"
 
 
@@ -15,26 +15,26 @@ HOME_LINK = "https://github.com/op200/my_Gadgets"
 class log:
     log_level = 0
 
-    @staticmethod
-    def output(msg: object):
+    @classmethod
+    def output(cls, msg: object):
         print(
             f"\033[32m{datetime.datetime.now().strftime('%Y.%m.%d %H:%M:%S.%f')[:-4]}\033[35m {msg}\033[0m"
         )
 
-    @staticmethod
-    def error(msg: object, level: int = 110):
-        if level > log.log_level:
-            log.output(f"\033[31m[ERROR] {msg}")
+    @classmethod
+    def error(cls, msg: object, level: int = 110):
+        if level > cls.log_level:
+            cls.output(f"\033[31m[ERROR] {msg}")
 
-    @staticmethod
-    def warning(msg: object, level: int = 70):
-        if level > log.log_level:
-            log.output(f"\033[33m[WARNING] {msg}")
+    @classmethod
+    def warning(cls, msg: object, level: int = 70):
+        if level > cls.log_level:
+            cls.output(f"\033[33m[WARNING] {msg}")
 
-    @staticmethod
-    def info(msg: object, level: int = 30):
-        if level > log.log_level:
-            log.output(f"\033[34m[INFO] {msg}")
+    @classmethod
+    def info(cls, msg: object, level: int = 30):
+        if level > cls.log_level:
+            cls.output(f"\033[34m[INFO] {msg}")
 
 
 def change_title(title: str):
@@ -58,17 +58,17 @@ is_print_frame_num: bool = False
 
 for cmd in cmds:
     match cmd:
-        case "-v" | "-version":
+        case "-v" | "-ver" | "-version":
             log.output(f"{PROGRAM_NAME}\nVersion: {VERSION}\n{HOME_LINK}")
-            sys.exit()
+            sys.exit(0)
         case "-h" | "-help":
             print(f"""
-    {PROGRAM_NAME} help:
+    {PROGRAM_NAME} v{VERSION} help:
 
     -h / -help
         print help
 
-    -v / -version
+    -v / -ver / -version
         print version
 
     -i / -input <string>
@@ -106,7 +106,7 @@ for cmd in cmds:
         if it > 140, all  logs    will not be print
         default: 0
             """)
-            sys.exit()
+            sys.exit(0)
 
 for i in range(len(cmds)):
     match cmds[i]:
@@ -124,7 +124,7 @@ for i in range(len(cmds)):
                 threshold = int(cmds[i + 1])
             except Exception as e:
                 log.error(f"threshold value error: {e}")
-                sys.exit()
+                sys.exit(1)
 
         # threshold
         case "-ml" | "-minlen":
@@ -132,7 +132,7 @@ for i in range(len(cmds)):
                 min_scene_len = int(cmds[i + 1])
             except Exception as e:
                 log.error(f"min_scene_len value error: {e}")
-                sys.exit()
+                sys.exit(1)
 
         # overwrite txt
         case "-ow":
@@ -148,16 +148,16 @@ for i in range(len(cmds)):
                 log.log_level = int(cmds[i + 1])
             except Exception as e:
                 log.error(f"log level error: {e}")
-                sys.exit()
+                sys.exit(1)
 
 
 if not input_path:
     log.error("Missing input file")
-    sys.exit()
+    sys.exit(1)
 
 if not output_path:
     log.error("Missing output file")
-    sys.exit()
+    sys.exit(1)
 
 elif output_path[-4:] != ".txt":
     log.warning(
@@ -170,12 +170,12 @@ if overwrite_txt is False:
     if os.path.exists(output_path):
         log.output("The output file already exists, overwrite it? [Y/N]")
         while conf_overwrite := input():
-            match conf_overwrite:
-                case "y" | "Y":
+            match conf_overwrite.lower():
+                case "y":
                     break
-                case "n" | "N":
+                case "n":
                     log.info("User exit program")
-                    sys.exit()
+                    sys.exit(0)
     overwrite_txt = True
 
 
@@ -185,17 +185,15 @@ class TXT:
     def __init__(self, path: str):
         f = None
         try:
-            if overwrite_txt:
-                f = open(path, "w")
-            else:
-                log.error("Unknown error 1")
-                sys.exit()
+            assert overwrite_txt is True, "Unknown error 1: overwrite_txt is False"
+            f = open(path, "w")
         except IOError:
-            log.error("can not open txt:" + path)
-            sys.exit()
+            log.error(f"can not open txt: {path}")
+            raise
         finally:
             if f:
                 f.close()
+
         self.path = path
         self.line_num = 1
 
@@ -204,10 +202,10 @@ class TXT:
             self.srt = open(self.path, "a")
         except IOError:
             log.error("can not open txt:" + self.path)
-            sys.exit()
-        self.writeLine("# keyframe format v1\nfps 0")
+            raise
+        self.write_line("# keyframe format v1\nfps 0")
 
-    def writeLine(self, line: object):
+    def write_line(self, line: object):
         self.srt.write(f"{line}\n")
 
     def end_write(self):
@@ -221,7 +219,7 @@ def find_scenes(video_path):
         video = open_video(video_path)
     except VideoOpenFailure as e:
         log.error(f"Open video error: {e}")
-        sys.exit()
+        sys.exit(1)
 
     # 创建统计管理器对象
     stats_manager = StatsManager()
@@ -257,13 +255,19 @@ def find_scenes(video_path):
 if __name__ == "__main__":
     log.info("Start detection")
 
-    txt = TXT(output_path)
-    txt.start_write()
+    try:
+        txt = TXT(output_path)
+        txt.start_write()
+    except IOError:
+        sys.exit(1)
+
     try:
         for frame_info in find_scenes(input_path):
-            txt.writeLine(frame_info[0].frame_num)
+            txt.write_line(frame_info[0].frame_num)
     except KeyboardInterrupt:
         log.info("User exit program")
+    finally:
+        txt.end_write()
 
     log.info("END")
     change_title("END")

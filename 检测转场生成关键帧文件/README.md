@@ -7,5 +7,5 @@
 
 Python >= 3.13
 ```
-pip install opencv-python scenedetect[opencv]
+pip install -U scenedetect[opencv]
 ```
