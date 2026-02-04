@@ -1,6 +1,6 @@
 ### 安装依赖
 
-```bash
+```pwsh
 pip install opencv-contrib-python easyrip tqdm
 ```
 

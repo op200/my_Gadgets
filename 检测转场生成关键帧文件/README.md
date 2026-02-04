@@ -1,6 +1,5 @@
 ### 介绍
 
-
 通过检测转场生成对应的关键帧文件，适用于 Aegisub 的关键帧文件导入
 
 ### 依赖
@@ -9,6 +8,6 @@
 
 Python >= 3.12
 
-```
+```pwsh
 pip install -U scenedetect[opencv]
 ```

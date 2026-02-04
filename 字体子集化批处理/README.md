@@ -2,7 +2,7 @@
 
 ##### Python库
 
-```
+```pwsh
 pip install loguru
 ```
 
