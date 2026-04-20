@@ -6,6 +6,8 @@ import shutil
 import subprocess
 import tkinter as tk
 import webbrowser
+from collections import OrderedDict
+from pathlib import Path
 from threading import Thread
 from tkinter import font as tkfont
 from tkinter import ttk
@@ -15,7 +17,7 @@ import numpy as np
 from PIL import Image, ImageTk
 
 PROGRAM_NAME = "生成GIF"
-VERSION = "0.1.3"
+VERSION = "0.2.0"
 HOME_LINK = "https://github.com/op200/my_Gadgets"
 
 
@@ -28,78 +30,92 @@ class log:
     num = 0
 
     @staticmethod
-    def output(info: str):
-        log_Text.insert(tk.END, info + "\n")
+    def output(text: str):
+        log_Text.insert(tk.END, text + "\n")
         log_Text.see(tk.END)
-        print(info)
+        print(text)
 
     @staticmethod
-    def error(info: str):
-        log.output(f"[ERROR] {info}")
+    def error(msg: str):
+        log.output(f"[ERROR] {msg}")
 
     @staticmethod
-    def warning(info: str):
-        log.output(f"[WARNING] {info}")
+    def warning(msg: str):
+        log.output(f"[WARNING] {msg}")
 
     @staticmethod
-    def info(info: str):
-        log.output(f"[INFO] {info}")
+    def info(msg: str):
+        log.output(f"[INFO] {msg}")
 
 
 # 判断系统对应路径
 os_type = platform.system()
 if os_type == "Windows":
-    config_dir = os.path.join(os.getenv("APPDATA", ""), "生成GIF")
+    config_dir = Path(os.getenv("APPDATA", ""), "生成GIF")
 elif os_type in {"Linux", "Darwin"}:
-    config_dir = os.path.join(os.path.expanduser("~"), ".config", "生成GIF")
+    config_dir = Path.home() / ".config" / "生成GIF"
 else:
-    config_dir = ""
+    config_dir = Path()
     log.warning("无法确认系统")
 
-os.makedirs(config_dir, exist_ok=True)
+config_dir.mkdir(parents=True, exist_ok=True)
 
 ocr_choice: int = 1
 
 
 # 不存在配置则写入默认配置
-config = configparser.ConfigParser()
-config_file_pathname = os.path.join(config_dir, "config.ini")
-if not os.path.exists(config_file_pathname) or (
-    config.read(config_file_pathname) and config.get("DEFAULT", "version") != VERSION
+config_parser = configparser.ConfigParser()
+config_file_path = Path(config_dir, "config.ini")
+if not config_file_path.is_file() or (
+    config_parser.read(config_file_path)
+    and config_parser.get("DEFAULT", "version") != VERSION
 ):
-    config["DEFAULT"] = {
+    config_parser["DEFAULT"] = {
         "version": VERSION,
         "output_path": r".\output.gif",
+        # scale
         "is_scale": "0",
         "scale_width": "0",
         "scale_height": "0",
+        # FPS
         "is_change_fps": "0",
         "new_fps": "6",
+        # PTS
         "is_change_PTS": "0",
         "new_PTS": "1",
+        # filter
+        "use_palettegen_filter": "1",
     }
-    with open(config_file_pathname, "w") as config_file:
-        config.write(config_file)
+    with config_file_path.open("w", encoding="utf-8") as config_file:
+        config_parser.write(config_file)
 
 
 def save_config():
-    config["DEFAULT"]["output_path"] = set_outPath_Entry.get()
+    config_parser["DEFAULT"]["output_path"] = set_outPath_Entry.get()
 
-    config["DEFAULT"]["is_scale"] = str(1 if set_outScale_Tkbool.get() else 0)
-    config["DEFAULT"]["scale_width"] = set_outScale_width_Entry.get()
-    config["DEFAULT"]["scale_height"] = set_outScale_height_Entry.get()
+    # scale
+    config_parser["DEFAULT"]["is_scale"] = str(1 if set_outScale_Tkbool.get() else 0)
+    config_parser["DEFAULT"]["scale_width"] = set_outScale_width_Entry.get()
+    config_parser["DEFAULT"]["scale_height"] = set_outScale_height_Entry.get()
 
+    # FPS
     # config["DEFAULT"]["is_change_fps"] = str(1 if set_outFPS_Tkbool.get() else 0)
-    config["DEFAULT"]["new_fps"] = set_outFPS_Entry.get()
+    config_parser["DEFAULT"]["new_fps"] = set_outFPS_Entry.get()
 
-    config["DEFAULT"]["is_change_PTS"] = str(1 if set_outPTS_Tkbool.get() else 0)
-    config["DEFAULT"]["new_PTS"] = set_outPTS_Entry.get()
+    # PTS
+    config_parser["DEFAULT"]["is_change_PTS"] = str(1 if set_outPTS_Tkbool.get() else 0)
+    config_parser["DEFAULT"]["new_PTS"] = set_outPTS_Entry.get()
+
+    # filter
+    config_parser["DEFAULT"]["use_palettegen_filter"] = str(
+        1 if set_palettegen_Tkbool.get() else 0
+    )
 
     try:
-        with open(config_file_pathname, "w") as configfile:
-            config.write(configfile)
-    except FileNotFoundError:
-        pass
+        with config_file_path.open("w", encoding="utf-8") as configfile:
+            config_parser.write(configfile)
+    except FileNotFoundError as e:
+        log.error(f"{e} {e!r}")
 
 
 input_path: str
@@ -143,15 +159,15 @@ menu_setting_Menu = tk.Menu(menu_Menu, tearoff=0)
 
 
 def open_temp():
-    log.info("'打开缓存位置'功能暂时未做")
+    os.startfile(config_dir)
 
 
 def remove_config_dir():
-    if os.path.exists(config_dir):
+    if config_dir.is_dir():
         shutil.rmtree(config_dir)
-        log.info("已删除" + config_dir)
+        log.info(f'已删除 "{config_dir}"')
     else:
-        log.error("未找到配置文件目录" + config_dir)
+        log.error(f'未找到配置文件目录 "{config_dir}"')
 
 
 menu_Menu.add_cascade(label="设置", menu=menu_setting_Menu)
@@ -228,10 +244,51 @@ frame_count = 0
 frame_now = 0
 
 
+class Frame_cache(OrderedDict[int, cv2.typing.MatLike]):
+    def __init__(self, maxsize: int = 48, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.set_maxsize(maxsize)
+
+    def _pop_old(self):
+        while len(self) > self._maxsize:
+            self.pop_frame()
+
+    def set_maxsize(self, new_size: int, /):
+        if new_size < 1:
+            raise ValueError("size must >= 1")
+        self._maxsize: int = new_size
+        self._pop_old()
+
+    def add_frame(self, num: int, frame: cv2.typing.MatLike, /):
+        self[num] = frame
+        self._pop_old()
+
+    def pop_frame(self):
+        self.popitem(last=False)
+
+
+frame_cache = Frame_cache()
+
+
 # 跳转当前帧
-def jump_to_frame():
-    main_rendering_Cap.set(cv2.CAP_PROP_POS_FRAMES, frame_now)
-    _, frame = main_rendering_Cap.read()
+def jump_to_frame(new_frame: int | None = None):
+    global frame_now
+
+    if new_frame is None:
+        new_frame = frame_now
+
+    if new_frame in frame_cache:
+        frame = frame_cache[new_frame]
+    elif new_frame == frame_now:
+        _, frame = main_rendering_Cap.retrieve()
+    else:
+        if new_frame != frame_now + 1:
+            main_rendering_Cap.set(cv2.CAP_PROP_POS_FRAMES, new_frame)
+        _, frame = main_rendering_Cap.read()
+
+    frame_now = new_frame
+    frame_cache.add_frame(frame_now, frame)
+
     try:
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     except cv2.error:
@@ -259,13 +316,13 @@ def jump_to_frame():
 
 # 进度条的滚轮事件
 def video_progressbar_mousewheel(event):
-    global frame_now
-    frame_now += 1 if event.delta < 0 else -1
-    frame_now = max(frame_now, 0)
-    if frame_now >= frame_count:
-        frame_now = frame_count - 1
+    new_frame = frame_now
+    new_frame += 1 if event.delta < 0 else -1
+    new_frame = max(new_frame, 0)
+    if new_frame >= frame_count:
+        new_frame = frame_count - 1
 
-    jump_to_frame()
+    jump_to_frame(new_frame)
 
 
 video_review_Label.bind("<MouseWheel>", video_progressbar_mousewheel)
@@ -279,9 +336,8 @@ def video_progressbar_leftDrag(event):
     ratio = min(ratio, 1)
     ratio = max(ratio, 0)
     # video_Progressbar["value"] = ratio * 100
-    global frame_now
-    frame_now = int((frame_count - 1) * ratio)
-    jump_to_frame()
+
+    jump_to_frame(int((frame_count - 1) * ratio))
 
 
 video_Progressbar.bind("<B1-Motion>", video_progressbar_leftDrag)
@@ -307,8 +363,7 @@ def submit_path(_):
         new_frame_height, \
         new_frame_width, \
         fps, \
-        difference_list, \
-        frame_now
+        difference_list
     input_path = input_video_Entry.get()
     # 渲染控件
     frame_num_Frame.grid(row=2, column=0)
@@ -362,8 +417,7 @@ def submit_path(_):
         video_Progressbar.grid(row=2, column=0)
 
         # 渲染进度
-        frame_now = 0
-        jump_to_frame()
+        jump_to_frame(0)
 
         # 初始化右侧控件
         frame_count = int(main_rendering_Cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -398,7 +452,7 @@ def submit_path(_):
         video_frame_Label.grid(row=3, column=0)
 
     else:
-        log.error("无法打开" + input_path)
+        log.error(f'无法打开 "{input_path}"')
 
     root_Tk.focus_set()
 
@@ -428,13 +482,11 @@ frame_num_Frame = ttk.Frame(right_Frame)
 
 
 def enter_to_change_frame_now(_):
-    global frame_now
+    new_frame = max(int(frame_now_Entry.get()), 0)
+    if new_frame >= frame_count:
+        new_frame = frame_count - 1
 
-    frame_now = max(int(frame_now_Entry.get()), 0)
-    if frame_now >= frame_count:
-        frame_now = frame_count - 1
-
-    jump_to_frame()
+    jump_to_frame(new_frame)
     root_Tk.focus_set()
 
 
@@ -458,9 +510,7 @@ def set_start_frame_num_Click(
     frame1_Tkint: tk.IntVar, frame2_Tkint: tk.IntVar, flush_frame_now: int | None = None
 ):
     if flush_frame_now:
-        global frame_now
-        frame_now = flush_frame_now
-        jump_to_frame()
+        jump_to_frame(flush_frame_now)
 
     frame1_Tkint.set(frame_now_Tkint.get())
     if start_frame_num_Tkint.get() > end_frame_num_Tkint.get():
@@ -599,7 +649,7 @@ set_outPath_Label = ttk.Label(set_outPath_Frame, text="输出位置:")
 set_outPath_Label.grid(row=0, column=0)
 
 set_outPath_Entry = ttk.Entry(set_outPath_Frame)
-set_outPath_Entry.insert(0, config.get("DEFAULT", "output_path"))
+set_outPath_Entry.insert(0, config_parser.get("DEFAULT", "output_path"))
 set_outPath_Entry.grid(row=0, column=1)
 
 
@@ -611,7 +661,7 @@ set_outScale_weight_Label = ttk.Label(set_outScale_Frame, text="宽:")
 set_outScale_weight_Label.grid(row=0, column=0)
 
 set_outScale_width_Entry = ttk.Entry(set_outScale_Frame, width=4)
-set_outScale_width_Entry.insert(0, config.get("DEFAULT", "scale_width"))
+set_outScale_width_Entry.insert(0, config_parser.get("DEFAULT", "scale_width"))
 set_outScale_width_Entry.grid(row=0, column=1)
 
 ttk.Frame(set_outScale_Frame).grid(row=0, column=2, padx=10)
@@ -620,7 +670,7 @@ set_outScale_height_Label = ttk.Label(set_outScale_Frame, text="高:")
 set_outScale_height_Label.grid(row=0, column=3)
 
 set_outScale_height_Entry = ttk.Entry(set_outScale_Frame, width=4)
-set_outScale_height_Entry.insert(0, config.get("DEFAULT", "scale_height"))
+set_outScale_height_Entry.insert(0, config_parser.get("DEFAULT", "scale_height"))
 set_outScale_height_Entry.grid(row=0, column=4)
 
 
@@ -634,7 +684,7 @@ def set_outScale_Checkbutton_Click():
 
 
 set_outScale_Tkbool = tk.BooleanVar()
-set_outScale_Tkbool.set(bool(int(config.get("DEFAULT", "is_scale"))))
+set_outScale_Tkbool.set(bool(int(config_parser.get("DEFAULT", "is_scale"))))
 set_outScale_Checkbutton = ttk.Checkbutton(
     set_outScale_Frame,
     text="重缩放",
@@ -652,7 +702,7 @@ set_outFPS_Label = ttk.Label(set_outFPS_Frame, text="输出帧率:      ")
 set_outFPS_Label.grid(row=0, column=0)
 
 set_outFPS_Entry = ttk.Entry(set_outFPS_Frame, width=14)
-set_outFPS_Entry.insert(0, config.get("DEFAULT", "new_fps"))
+set_outFPS_Entry.insert(0, config_parser.get("DEFAULT", "new_fps"))
 set_outFPS_Entry.grid(row=0, column=1)
 
 
@@ -661,7 +711,7 @@ set_outPTS_Frame = ttk.Frame(output_setup_frame)
 set_outPTS_Frame.grid(row=3, pady=10)
 
 set_outPTS_Entry = ttk.Entry(set_outPTS_Frame, width=16)
-set_outPTS_Entry.insert(0, config.get("DEFAULT", "new_PTS"))
+set_outPTS_Entry.insert(0, config_parser.get("DEFAULT", "new_PTS"))
 set_outPTS_Entry.grid(row=0, column=0)
 
 
@@ -673,7 +723,7 @@ def set_outPTS_Checkbutton_Click():
 
 
 set_outPTS_Tkbool = tk.BooleanVar()
-set_outPTS_Tkbool.set(bool(int(config.get("DEFAULT", "is_change_PTS"))))
+set_outPTS_Tkbool.set(bool(int(config_parser.get("DEFAULT", "is_change_PTS"))))
 set_outPTS_Checkbutton = ttk.Checkbutton(
     set_outPTS_Frame,
     text="重设PTS倍率",
@@ -681,6 +731,23 @@ set_outPTS_Checkbutton = ttk.Checkbutton(
     command=set_outPTS_Checkbutton_Click,
 )
 set_outPTS_Checkbutton.grid(row=0, column=5, padx=15)
+
+
+# 调色板
+set_palettegen_Frame = ttk.Frame(output_setup_frame)
+set_palettegen_Frame.grid(row=4, pady=10)
+
+
+set_palettegen_Tkbool = tk.BooleanVar()
+set_palettegen_Tkbool.set(
+    bool(int(config_parser.get("DEFAULT", "use_palettegen_filter")))
+)
+set_palettegen_Checkbutton = ttk.Checkbutton(
+    set_palettegen_Frame,
+    text="调色板滤镜",
+    var=set_palettegen_Tkbool,  # type: ignore
+)
+set_palettegen_Checkbutton.grid(row=0, column=5, padx=15)
 
 
 createGIF_set_Frame = ttk.Frame(right_Frame)
@@ -704,8 +771,7 @@ log_Text.grid(row=0, column=0, sticky="nsew")
 
 log_vScrollbar.config(command=log_Text.yview)
 # 读取配置
-config.read(config_file_pathname)
-# if config.get("DEFAULT","") == "":
+config_parser.read(config_file_path)
 
 
 # 选框
@@ -714,8 +780,7 @@ start_x, start_y, end_x, end_y = 0, 0, 0, 0
 
 def draw_box():
     global right_x, right_y, left_x, left_y
-    main_rendering_Cap.set(cv2.CAP_PROP_POS_FRAMES, frame_now)
-    _, frame = main_rendering_Cap.read()
+    _, frame = main_rendering_Cap.retrieve()
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
     right_x = min(start_x, end_x)
@@ -881,27 +946,34 @@ def Thread_encoding():
     set_pts = f"setpts={set_outPTS_Entry.get()}*PTS," if set_outPTS_Tkbool.get() else ""
     set_fps = f"fps={set_outFPS_Entry.get()},"
 
-    process_ffmpeg = subprocess.Popen(
-        [
-            "ffmpeg",
-            "-y",
-            "-ss",
-            str(start_frame_num_Tkint.get() / fps),
-            "-to",
-            str(end_frame_num_Tkint.get() / fps),
-            "-i",
-            str(input_path),
-            "-map",
-            "0:v",
-            "-vf",
-            f"{set_crop}{set_scale}{set_pts}{set_fps}split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
-            (
-                set_outPath_Entry.get()
-                if set_outPath_Entry.get()[-4:] == ".gif"
-                else set_outPath_Entry.get() + ".gif"
-            ),
-        ]
-    )
+    ff_cmd = [
+        "ffmpeg",
+        "-y",
+        "-ss",
+        str(start_frame_num_Tkint.get() / fps),
+        "-to",
+        str(end_frame_num_Tkint.get() / fps),
+        "-i",
+        input_path,
+        "-map",
+        "0:v",
+        "-vf",
+        (
+            f"{set_crop}{set_scale}{set_pts}{set_fps}"
+            + (
+                "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse"
+                if set_palettegen_Tkbool.get()
+                else ""
+            )
+        ),
+        (
+            set_outPath_Entry.get()
+            if set_outPath_Entry.get().endswith(".gif")
+            else set_outPath_Entry.get() + ".gif"
+        ),
+    ]
+    log.output(" ".join((f'"{s}"' if " " in s else s) for s in ff_cmd))
+    process_ffmpeg = subprocess.Popen(ff_cmd)
 
     process_ffmpeg.wait()
 
@@ -941,10 +1013,11 @@ def cancel_encoding():
     end_to_ready()
 
 
-if os.name == "nt":
-    try:
-        ctypes.windll.user32.SetProcessDPIAware()
-    except Exception:
-        log.warning("Windows DPI Aware failed")
+if __name__ == "__main__":
+    if os.name == "nt":
+        try:
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            log.warning("Windows DPI Aware failed")
 
-root_Tk.mainloop()
+    root_Tk.mainloop()
